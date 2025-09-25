@@ -18,6 +18,12 @@ on:
         description: 'Deploy: on - deploy'
         default: 'off'
         required: false
+      install_muse_sounds:
+        description: 'Install Muse Sounds'
+        default: 'off'
+        type: string
+        required: false
+        
   workflow_call:
     inputs:
       build_mode:
@@ -35,7 +41,15 @@ on:
         default: 'off'
         type: string
         required: false
+      install_muse_sounds:
+        description: 'Install Muse Sounds'
+        default: 'off'
+        type: string
+        required: false
 
+env:
+  INSTALL_MUSE_SOUNDS: ${{ inputs.install_muse_sounds != '' && inputs.install_muse_sounds || 'off' }}
+  
 jobs:
   backend:
     runs-on: ubuntu-22.04
@@ -47,7 +61,7 @@ jobs:
         access_token: ${{ github.token }}
     - name: Clone repository
       uses: actions/checkout@v5
-
+     
     - name: "Configure workflow"
       run: |
         bash ./buildscripts/ci/tools/make_build_mode_env.sh -e ${{ github.event_name }} -m ${{ inputs.build_mode }}
@@ -123,7 +137,8 @@ jobs:
     - name: Build Docker (used package from S3)
       if: env.DO_PUBLISH == 'true'
       run: |
-        bash ./buildscripts/ci/backend/build_docker.sh
+        echo "INSTALL_MUSE_SOUNDS: ${{ env.INSTALL_MUSE_SOUNDS }}"
+        bash ./buildscripts/ci/backend/build_docker.sh --install_muse_sounds ${{ env.INSTALL_MUSE_SOUNDS }}
 
     - name: Publish to Registry
       if: env.DO_PUBLISH == 'true'
