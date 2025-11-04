@@ -136,7 +136,12 @@ Ret NetworkManager::execRequest(RequestType requestType, const QUrl& url, Incomi
     }
 
     if (outgoingData && outgoingData->device()) {
+        LOGI() << "Closing outgoing device: " << requestTypeToString(requestType) << ", url: " << url.toString();
         closeDevice(outgoingData->device());
+    }
+
+    if (m_incomingData) {
+        LOGI() << "Closing incoming device: " << requestTypeToString(requestType) << ", url: " << url.toString();
     }
 
     closeDevice(m_incomingData);
@@ -149,6 +154,8 @@ Ret NetworkManager::execRequest(RequestType requestType, const QUrl& url, Incomi
 
 QNetworkReply* NetworkManager::receiveReply(RequestType requestType, const QNetworkRequest& request, OutgoingDevice* outgoingData)
 {
+    LOGI() << "Send request: " << requestTypeToString(requestType) << ", url: " << request.url().toString();
+
     switch (requestType) {
     case GET_REQUEST: return m_manager->get(request);
     case HEAD_REQUEST: return m_manager->head(request);
@@ -220,6 +227,8 @@ void NetworkManager::closeDevice(QIODevice* device)
 void NetworkManager::prepareReplyReceive(QNetworkReply* reply, IncomingDevice* incomingData)
 {
     if (incomingData) {
+        LOGI() << "Setup data read: " << reply->url().toString();
+
         connect(reply, &QNetworkReply::downloadProgress, this, [this](const qint64 curr, const qint64 total) {
             m_progress.progress(curr, total);
         });
@@ -234,13 +243,21 @@ void NetworkManager::prepareReplyReceive(QNetworkReply* reply, IncomingDevice* i
                 return;
             }
 
+            LOGI() << "Start read data: " << reply->url().toString();
             m_incomingData->write(reply->readAll());
+            LOGI() << "Finish read data: " << reply->url().toString();
         });
     }
 }
 
 void NetworkManager::prepareReplyTransmit(QNetworkReply* reply)
 {
+    IF_ASSERT_FAILED(reply) {
+        return;
+    }
+
+    LOGI() << "Setup progress: " << reply->url().toString();
+
     connect(reply, &QNetworkReply::uploadProgress, this, [this](qint64 curr, qint64 total) {
         m_progress.progress(curr, total);
     });
@@ -253,8 +270,11 @@ Ret NetworkManager::waitForReplyFinished(QNetworkReply* reply)
     }
 
     if (reply->isFinished()) {
+        LOGW() << "Reply is not running: " << reply->url().toString();
         return errorFromReply(reply);
     }
+
+    LOGI() << "Waiting for reply: " << reply->url().toString();
 
     QEventLoop loop;
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
@@ -262,6 +282,8 @@ Ret NetworkManager::waitForReplyFinished(QNetworkReply* reply)
     m_reply = reply;
     loop.exec();
     m_reply = nullptr;
+
+    LOGI() << "Reply received: " << reply->url().toString();
 
     return errorFromReply(reply);
 }
@@ -271,6 +293,8 @@ Ret NetworkManager::errorFromReply(const QNetworkReply* reply) const
     if (!reply) {
         return make_ret(Err::NetworkError);
     }
+
+    LOGI() << "Converting reply to ret: " << reply->url().toString();
 
     Ret ret = muse::make_ok();
 
